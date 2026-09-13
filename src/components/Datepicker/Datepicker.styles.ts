@@ -1,31 +1,38 @@
+// src/components/Datepicker/Datepicker.styles.ts
 import { StyleSheet } from 'react-native'
 import { colors } from '../../styles/colors'
+
 export const styles = StyleSheet.create({
   datepicker: {
     width: '100%',
-    gap: 8,
+    gap: 4,
   },
   inline: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   label: {
-    color: colors.typographyDefault,
+    fontSize: 13,
+    color: colors.primary,
+    fontFamily: 'Inter_600SemiBold',
   },
-  input: {
+input: {
+    backgroundColor: '#ffffff',
+    borderColor: colors.primary,
+    borderWidth: 1.5,
     borderRadius: 8,
-    borderWidth: 2,
     fontFamily: 'Inter_400Regular',
     fontSize: 16,
     color: colors.primary,
+    height: 48,
+    paddingHorizontal: 14,
+    width: '100%',
   },
   medium: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    height: 48,
   },
   large: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    height: 48,
   },
   fullwidth: {
     width: '100%',
@@ -38,7 +45,7 @@ export const styles = StyleSheet.create({
     color: colors.secondary,
   },
   outline: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.primary,
     backgroundColor: colors.white,
   },

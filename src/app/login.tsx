@@ -1,16 +1,49 @@
 import { Link, useRouter } from 'expo-router'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 import { useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, View } from 'react-native'
 
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { Button, Input, Typography } from '@/components/ui'
 import { Spacing } from '@/constants/theme'
+import { auth } from '@/services/firebase'
 import { theme } from '@/styles/variables'
 
 export default function LoginScreen() {
   const router = useRouter()
-  const [usuario, setUsuario] = useState('')
+  const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleLogin() {
+    if (!email.trim() || !senha) {
+      Alert.alert('Atenção', 'Preencha o e-mail e a senha.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      await signInWithEmailAndPassword(auth, email.trim(), senha)
+      router.replace('/home')
+    } catch (error: any) {
+      console.error('Erro ao fazer login:', error)
+
+      let mensagem = 'Verifique suas credenciais e tente novamente.'
+      if (error.code === 'auth/invalid-email') {
+        mensagem = 'O e-mail digitado não é válido.'
+      } else if (
+        error.code === 'auth/user-not-found' ||
+        error.code === 'auth/invalid-credential' ||
+        error.code === 'auth/wrong-password'
+      ) {
+        mensagem = 'E-mail ou senha incorretos.'
+      }
+
+      Alert.alert('Erro no login', mensagem)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <AuthLayout
@@ -31,16 +64,17 @@ export default function LoginScreen() {
     >
       <View style={styles.field}>
         <Typography variant="title" color="active">
-          Usuário
+          E-mail
         </Typography>
         <Input
           fullWidth
           paddingSize="large"
-          placeholder="Digite seu usuário"
+          placeholder="seu@email.com"
           autoCapitalize="none"
           autoCorrect={false}
-          value={usuario}
-          onChangeText={setUsuario}
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
         />
       </View>
 
@@ -58,8 +92,8 @@ export default function LoginScreen() {
         />
       </View>
 
-      <Button fullWidth size="large" onPress={() => router.push('/home')}>
-        Entrar
+      <Button fullWidth size="large" onPress={handleLogin} disabled={loading}>
+        {loading ? 'Entrando...' : 'Entrar'}
       </Button>
     </AuthLayout>
   )

@@ -1,25 +1,10 @@
-import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Platform, Pressable, StyleSheet, View } from 'react-native'
-import DatePicker from 'react-native-date-picker'
+import { useEffect, useState } from 'react'
+import { Platform, StyleSheet, TextInput, View } from 'react-native'
 
 import Typography from '../ui/Typography/Typography'
 import { styles } from './Datepicker.styles'
 import { DatepickerProps } from './Datepicker.types'
-
-const parseDate = (value?: string) => {
-  if (!value) return new Date()
-
-  const date = new Date(`${value}T00:00:00`)
-  return Number.isNaN(date.getTime()) ? new Date() : date
-}
-
-const formatDate = (date: Date) =>
-  date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
 
 const toInputDate = (value?: string) =>
   value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''
@@ -33,14 +18,25 @@ export default function Datepicker({
   id,
   label,
   value,
-  placeholder = 'Selecione uma data',
+  placeholder = 'AAAA-MM-DD ou DD/MM/AAAA',
   minimumDate,
   maximumDate,
   style,
   onChange,
 }: DatepickerProps) {
-  const [open, setOpen] = useState(false)
-  const selectedDate = parseDate(value)
+  const [textValue, setTextValue] = useState('')
+
+  useEffect(() => {
+    if (value) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const [year, month, day] = value.split('-')
+        setTextValue(`${day}/${month}/${year}`)
+      } else {
+        setTextValue(value)
+      }
+    }
+  }, [value])
+
   const inputStyle = StyleSheet.flatten([
     styles.input,
     styles[paddingSize],
@@ -61,10 +57,17 @@ export default function Datepicker({
           max={maximumDate?.toISOString().slice(0, 10)}
           min={minimumDate?.toISOString().slice(0, 10)}
           onChange={(event) => {
-            onChange?.(parseDate(event.target.value))
+            const dateObj = new Date(`${event.target.value}T00:00:00`)
+            onChange?.(dateObj)
           }}
           placeholder={placeholder}
-          style={inputStyle}
+          style={{
+            ...(inputStyle as Record<string, any>),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
+          }}
           type="date"
           value={toInputDate(value)}
         />
@@ -75,38 +78,29 @@ export default function Datepicker({
   return (
     <View style={[styles.datepicker, inline && styles.inline]}>
       {label ? <Typography style={styles.label}>{label}</Typography> : null}
-      <Pressable
-        accessibilityLabel={label ?? placeholder}
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        onPress={() => setOpen(true)}
-        style={[
-          styles.input,
-          styles[paddingSize],
-          styles[variant],
-          fullWidth && styles.fullwidth,
-          disabled && styles.disabled,
-          style,
-        ]}
-        testID={id}
-      >
-        <Typography>
-          {value ? formatDate(selectedDate) : placeholder}
-        </Typography>
-      </Pressable>
-      <DatePicker
-        modal
-        open={open}
-        date={selectedDate}
-        mode="date"
-        minimumDate={minimumDate}
-        maximumDate={maximumDate}
-        onConfirm={(date) => {
-          setOpen(false)
-          onChange?.(date)
+      <TextInput
+        editable={!disabled}
+        id={id}
+        placeholder={placeholder}
+        placeholderTextColor="#888888"
+        style={inputStyle as any}
+        value={textValue}
+        onChangeText={(text) => {
+          setTextValue(text)
+          // Formata automaticamente ou converte se tiver o tamanho ideal
+          const cleaned = text.replace(/\D/g, '')
+          if (cleaned.length === 8) {
+            const day = cleaned.slice(0, 2)
+            const month = cleaned.slice(2, 4)
+            const year = cleaned.slice(4, 8)
+            const parsed = new Date(`${year}-${month}-${day}T00:00:00`)
+            if (!Number.isNaN(parsed.getTime())) {
+              onChange?.(parsed)
+            }
+          }
         }}
-        onCancel={() => setOpen(false)}
+        keyboardType="numeric"
+        maxLength={10}
       />
     </View>
   )

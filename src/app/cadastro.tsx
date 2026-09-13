@@ -1,16 +1,54 @@
-import { Link } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, View } from 'react-native'
 
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { Button, Input, Typography } from '@/components/ui'
 import { Spacing } from '@/constants/theme'
+import { auth } from '@/services/firebase'
 import { theme } from '@/styles/variables'
 
 export default function CadastroScreen() {
-  const [usuario, setUsuario] = useState('')
+  const router = useRouter()
+  const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [confirmarSenha, setConfirmarSenha] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSignUp() {
+    if (!email.trim() || !senha || !confirmarSenha) {
+      Alert.alert('Atenção', 'Preencha todos os campos.')
+      return
+    }
+
+    if (senha !== confirmarSenha) {
+      Alert.alert('Erro', 'As senhas não coincidem.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      await createUserWithEmailAndPassword(auth, email.trim(), senha)
+      Alert.alert('Sucesso', 'Conta criada com sucesso!')
+      router.replace('/home')
+    } catch (error: any) {
+      console.error('Erro ao cadastrar:', error)
+
+      let mensagem = 'Não foi possível criar a conta.'
+      if (error.code === 'auth/email-already-in-use') {
+        mensagem = 'Este e-mail já está cadastrado.'
+      } else if (error.code === 'auth/invalid-email') {
+        mensagem = 'O e-mail digitado não é válido.'
+      } else if (error.code === 'auth/weak-password') {
+        mensagem = 'A senha precisa ter pelo menos 6 caracteres.'
+      }
+
+      Alert.alert('Erro no cadastro', mensagem)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <AuthLayout
@@ -31,16 +69,17 @@ export default function CadastroScreen() {
     >
       <View style={styles.field}>
         <Typography variant="title" color="active">
-          Usuário
+          E-mail
         </Typography>
         <Input
           fullWidth
           paddingSize="large"
-          placeholder="Digite seu usuário"
+          placeholder="seu@email.com"
           autoCapitalize="none"
           autoCorrect={false}
-          value={usuario}
-          onChangeText={setUsuario}
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
         />
       </View>
 
@@ -72,8 +111,8 @@ export default function CadastroScreen() {
         />
       </View>
 
-      <Button fullWidth size="large" onPress={() => {}}>
-        Criar conta
+      <Button fullWidth size="large" onPress={handleSignUp} disabled={loading}>
+        {loading ? 'Criando conta...' : 'Criar conta'}
       </Button>
     </AuthLayout>
   )
