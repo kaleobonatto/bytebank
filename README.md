@@ -5,6 +5,7 @@ Aplicação de gerenciamento financeiro desenvolvida em React Native (Expo) para
 
 ## 📋 Sobre o Projeto
 
+
 Este projeto integra os conhecimentos de navegação, segurança, autenticação e armazenamento em nuvem obtidos ao longo da fase. A aplicação entrega uma experiência mobile completa de controle de finanças pessoais.
 
 ## 🚀 Funcionalidades Principais
