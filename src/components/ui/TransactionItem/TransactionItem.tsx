@@ -1,4 +1,4 @@
-import { Pressable, View } from 'react-native'
+import { Linking, Pressable, View } from 'react-native'
 
 import Icon from '../Icon/Icon'
 import Typography from '../Typography/Typography'
@@ -11,9 +11,11 @@ export default function TransactionItem({
   name,
   amount,
   date,
+  receiptUrl,
   onDelete,
+  onEdit,
   style,
-}: TransactionItemProps & { onDelete?: () => void }) {
+}: TransactionItemProps & { onDelete?: () => void; onEdit?: () => void; receiptUrl?: string }) {
   const amountStyle = [
     styles.amount,
     amount >= 0 ? styles.amountPositive : styles.amountNegative,
@@ -37,19 +39,50 @@ export default function TransactionItem({
             </Typography>
           </View>
 
-          {onDelete ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Excluir transação"
-              onPress={onDelete}
-              style={({ pressed }) => [
-                styles.deleteButton,
-                pressed && styles.deleteButtonPressed,
-              ]}
-            >
-              <Icon name="delete-outline" size={20} color="#d33418" />
-            </Pressable>
-          ) : null}
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            {receiptUrl ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ver recibo anexado"
+                onPress={() => Linking.openURL(receiptUrl)}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  { backgroundColor: 'rgba(0, 77, 97, 0.08)' },
+                  pressed && { backgroundColor: 'rgba(0, 77, 97, 0.2)' },
+                ]}
+              >
+                <Icon name="attachment" size={18} color="#004d61" />
+              </Pressable>
+            ) : null}
+
+            {onEdit ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Editar transação"
+                onPress={onEdit}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  pressed && styles.deleteButtonPressed,
+                ]}
+              >
+                <Icon name="edit" size={20} color="#004d61" />
+              </Pressable>
+            ) : null}
+
+            {onDelete ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Excluir transação"
+                onPress={onDelete}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  pressed && styles.deleteButtonPressed,
+                ]}
+              >
+                <Icon name="delete-outline" size={20} color="#d33418" />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {name ? (

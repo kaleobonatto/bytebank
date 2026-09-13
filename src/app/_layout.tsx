@@ -8,6 +8,8 @@ import {
 import { Stack } from 'expo-router'
 import { ActivityIndicator, View } from 'react-native'
 
+import { AuthProvider } from '@/contexts/AuthContext'
+import { TransactionProvider } from '@/contexts/TransactionContext'
 import { Header as AppHeader } from '../components/layout'
 
 export default function RootLayout() {
@@ -20,27 +22,25 @@ export default function RootLayout() {
 
   if (!fontsLoaded) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <AppHeader></AppHeader>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <AppHeader />
         <ActivityIndicator />
       </View>
     )
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="cadastro" />
-      <Stack.Screen name="home" />
-      <Stack.Screen name="auth" />
-      <Stack.Screen name="transactions" />
-    </Stack>
+    <AuthProvider>
+      <TransactionProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="cadastro" />
+          <Stack.Screen name="home" />
+          <Stack.Screen name="auth" />
+          <Stack.Screen name="transactions" />
+        </Stack>
+      </TransactionProvider>
+    </AuthProvider>
   )
 }

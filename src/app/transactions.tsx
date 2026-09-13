@@ -1,24 +1,15 @@
 import { useRouter } from 'expo-router'
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  QueryDocumentSnapshot,
-  startAfter,
-  where
-} from 'firebase/firestore'
-import { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { useState } from 'react'
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import EditTransactionModal from '@/components/EditTransactionModal/EditTransactionModal'
 import { Button, Icon, Input, Paper, TransactionItem, Typography } from '@/components/ui'
-import { auth, db } from '@/services/firebase'
-import type { Transaction } from '@/shared/types/transaction'
+import { useTransactions } from '@/contexts/TransactionContext'
+import { auth } from '@/services/firebase'
+import { uploadReceiptImage } from '@/services/uploadStorage'
 import { colors } from '@/styles/colors'
+import type { Transaction } from '@/types/transaction'
 
 const categoryOptions = [
   { label: 'Todas', value: '' },
@@ -40,89 +31,13 @@ const formatDate = (value: string) => {
 
 export default function TransactionScreen() {
   const router = useRouter()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  
+  const { transactions, loading, loadingMore, fetchTransactions, removeTransaction, editTransaction } = useTransactions()
+  
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
-  
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null)
-  const [hasMore, setHasMore] = useState(true)
-
-  const fetchTransactions = async (isInitial = false) => {
-    const user = auth?.currentUser
-    if (!user) {
-      setLoading(false)
-      return
-    }
-
-    if (isInitial) {
-      setLoading(true)
-      setLastDoc(null)
-    } else {
-      if (!hasMore || loadingMore) return
-      setLoadingMore(true)
-    }
-
-    try {
-      let q = query(
-        collection(db, 'transactions'),
-        where('userId', '==', user.uid),
-        orderBy('date', 'desc'),
-        limit(10)
-      )
-
-      if (!isInitial && lastDoc) {
-        q = query(q, startAfter(lastDoc))
-      }
-
-      const snapshot = await getDocs(q)
-      const data: Transaction[] = snapshot.docs.map((docItem) => ({
-        id: docItem.id,
-        ...docItem.data(),
-      })) as Transaction[]
-
-      const lastVisible = snapshot.docs[snapshot.docs.length - 1]
-
-      if (isInitial) {
-        setTransactions(data)
-      } else {
-        setTransactions((prev) => [...prev, ...data])
-      }
-
-      setLastDoc(lastVisible || null)
-      setHasMore(snapshot.docs.length === 10)
-    } catch (error) {
-      console.error('Erro ao buscar transações no Firestore:', error)
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchTransactions(true)
-  }, [selectedCategory])
-
-  function removeTransaction(id: string) {
-    Alert.alert('Excluir transação', 'Deseja excluir esta transação?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, 'transactions', id))
-            await fetchTransactions(true)
-          } catch (error) {
-            console.error('Erro ao excluir transação:', error)
-            Alert.alert('Erro', 'Não foi possível excluir o item.')
-          }
-        },
-      },
-    ])
-  }
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
 
   const filteredTransactions = transactions.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase())
@@ -149,7 +64,7 @@ export default function TransactionScreen() {
           </Typography>
         </View>
 
-        {/* Filtro de Categorias em Pílulas Horizontais */}
+        {/* Filtro de Categorias */}
         <View style={styles.filterSection}>
           <ScrollView 
             horizontal 
@@ -190,7 +105,9 @@ export default function TransactionScreen() {
                   name={item.name}
                   amount={item.amount}
                   date={formatDate(item.date)}
+                  receiptUrl={(item as any).receiptUrl}
                   onDelete={() => removeTransaction(item.id)}
+                  onEdit={() => setEditingTransaction(item)}
                 />
               )}
               onEndReached={() => fetchTransactions(false)}
@@ -252,6 +169,50 @@ export default function TransactionScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Edição */}
+      {editingTransaction && (
+        <EditTransactionModal
+          isOpen={!!editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          initial={{
+            id: editingTransaction.id,
+            type: editingTransaction.type,
+            name: editingTransaction.name,
+            amount: editingTransaction.amount,
+            date: editingTransaction.date,
+            category: editingTransaction.category,
+            receiptUrl: (editingTransaction as any).receiptUrl,
+          }}
+          onSubmit={async (payload) => {
+            if (payload.id) {
+              const user = auth?.currentUser
+              let finalReceiptUrl = payload.receiptUrl
+
+              if (payload.receiptUrl && payload.receiptUrl.startsWith('file://') && user) {
+                const uploaded = await uploadReceiptImage(payload.receiptUrl, user.uid)
+                if (uploaded) finalReceiptUrl = uploaded
+              }
+
+              const finalAmount = 
+                payload.type === 'Depósito' || payload.type === 'Pix' 
+                  ? Math.abs(payload.amount) 
+                  : -Math.abs(payload.amount)
+
+              const success = await editTransaction(payload.id, {
+                type: payload.type,
+                name: payload.name,
+                amount: finalAmount,
+                date: payload.date,
+                category: payload.category as any,
+                receiptUrl: finalReceiptUrl,
+              } as any)
+
+              if (success) setEditingTransaction(null)
+            }
+          }}
+        />
+      )}
     </SafeAreaView>
   )
 }

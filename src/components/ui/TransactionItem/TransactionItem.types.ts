@@ -5,6 +5,8 @@ export type TransactionItemProps = {
   name?: string
   amount: number
   date: string
+  receiptUrl?: string
   onDelete?: () => void
+  onEdit?: () => void
   style?: StyleProp<ViewStyle>
 }
