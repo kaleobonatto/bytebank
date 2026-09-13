@@ -24,6 +24,18 @@ Este projeto integra os conhecimentos de navegação, segurança, autenticação
 - **Banco de Dados & Auth:** Firebase (Firestore e Auth)
 - **Gráficos:** React Native Gifted Charts e React Native SVG
 
+## ⚙️ Configuração do Firebase
+
+Para facilitar a avaliação deste Tech Challenge, as chaves de acesso ao Firebase do projeto já estão configuradas por padrão no arquivo `src/services/firebase.ts`. A aplicação rodará conectada ao ambiente de testes automaticamente.
+
+**Nota sobre boas práticas:** Em um ambiente de produção real, essas credenciais jamais seriam versionadas no código-fonte. Elas estariam isoladas em variáveis de ambiente (`.env`). 
+
+Caso o avaliador deseje apontar para o seu próprio projeto Firebase, basta seguir os passos abaixo:
+1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/).
+2. Ative os serviços de **Authentication**, **Firestore** e **Storage**.
+3. Substitua as credenciais no arquivo `src/services/firebase.ts`.
+
+
 ## 📥 Como Rodar o Projeto
 
 1. Clone o repositório em sua máquina:
