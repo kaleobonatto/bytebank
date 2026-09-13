@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native'
 
-import PopupMenu from '../PopupMenu/PopupMenu'
+import Icon from '../Icon/Icon'
 import Typography from '../Typography/Typography'
 
 import { styles } from './TransactionItem.styles'
@@ -11,101 +11,45 @@ export default function TransactionItem({
   name,
   amount,
   date,
-  menuItems,
-  menuPlacement = 'under-date',
-  selectable,
-  selected,
-  onSelectedChange,
+  onDelete,
   style,
-}: TransactionItemProps) {
+}: TransactionItemProps & { onDelete?: () => void }) {
   const amountStyle = [
     styles.amount,
     amount >= 0 ? styles.amountPositive : styles.amountNegative,
   ]
 
-  const menu = menuItems?.length ? (
-    <PopupMenu trigger="kebab" align="right" items={menuItems} />
-  ) : null
-
   return (
-    <View
-      style={[styles.transactionItem, selectable && styles.selectable, style]}
-    >
-      {selectable ? (
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityLabel="Selecionar item"
-          accessibilityState={{
-            checked: !!selected,
-          }}
-          onPress={() => onSelectedChange?.(!selected)}
-          style={styles.checkboxWrapper}
-        >
-          <View
-            style={[styles.checkboxBox, selected && styles.checkboxBoxChecked]}
-          >
-            {selected ? <View style={styles.checkmark} /> : null}
-          </View>
-        </Pressable>
-      ) : null}
-
+    <View style={[styles.transactionItem, style]}>
       <View style={styles.body}>
         <View style={styles.rowTop}>
-          {menuPlacement === 'home-stacked-date' ? (
-            <>
-              <View style={styles.leftStack}>
-                <Typography
-                  variant="body-sm"
-                  weight="bold"
-                  style={styles.typeText}
-                >
-                  {type}
-                </Typography>
+          <View style={styles.leftStack}>
+            <Typography
+              variant="body-sm"
+              weight="bold"
+              style={styles.typeText}
+            >
+              {type}
+            </Typography>
 
-                <Typography variant="body-sm" style={styles.dateText}>
-                  {date}
-                </Typography>
-              </View>
+            <Typography variant="body-sm" style={styles.dateText}>
+              {date}
+            </Typography>
+          </View>
 
-              {menu ? <View style={styles.kebabWrapper}>{menu}</View> : null}
-            </>
-          ) : menuPlacement === 'inline-right' ? (
-            <>
-              <Typography
-                variant="body-sm"
-                weight="bold"
-                style={styles.typeText}
-              >
-                {type}
-              </Typography>
-
-              <View style={styles.inlineRight}>
-                <Typography variant="body-sm" style={styles.dateText}>
-                  {date}
-                </Typography>
-
-                {menu}
-              </View>
-            </>
-          ) : (
-            <>
-              <Typography
-                variant="body-sm"
-                weight="bold"
-                style={styles.typeText}
-              >
-                {type}
-              </Typography>
-
-              <View style={styles.rightTop}>
-                <Typography variant="body-sm" style={styles.dateText}>
-                  {date}
-                </Typography>
-
-                {menu ? <View style={styles.kebabWrapper}>{menu}</View> : null}
-              </View>
-            </>
-          )}
+          {onDelete ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Excluir transação"
+              onPress={onDelete}
+              style={({ pressed }) => [
+                styles.deleteButton,
+                pressed && styles.deleteButtonPressed,
+              ]}
+            >
+              <Icon name="delete-outline" size={20} color="#d33418" />
+            </Pressable>
+          ) : null}
         </View>
 
         {name ? (

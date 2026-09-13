@@ -8,8 +8,8 @@ import {
   query,
   where
 } from 'firebase/firestore'
-import { useEffect, useState } from 'react'
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import Avatar from '@/components/Avatar/Avatar'
@@ -72,6 +72,28 @@ export default function Home() {
   const [date, setDate] = useState('')
   const [loadingCreate, setLoadingCreate] = useState(false)
 
+  // Variáveis de Animação (Animated nativo do React Native)
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(30)).current
+
+  useEffect(() => {
+    // Dispara a animação suave de entrada ao carregar o dashboard
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start()
+
+    fetchHomeTransactions()
+  }, [])
+
   const fetchHomeTransactions = async () => {
     const user = auth?.currentUser
     if (!user) return
@@ -93,38 +115,77 @@ export default function Home() {
     }
   }
 
-  useEffect(() => {
-    fetchHomeTransactions()
-  }, [])
-
   const balance = transactions.reduce((total, item) => total + item.amount, 0)
   
-  const monthlyData = [
-    {
-      name: 'Atual',
-      Receitas: transactions
-        .filter((item) => item.amount > 0)
-        .reduce((total, item) => total + item.amount, 0),
-      Despesas: transactions
-        .filter((item) => item.amount < 0)
-        .reduce((total, item) => total + Math.abs(item.amount), 0),
-    },
-  ]
+  // 1. Dados para o Gráfico de Evolução do Saldo Acumulado
+  const sortedTransactions = [...transactions].sort((a, b) => (a.date > b.date ? 1 : -1))
+  let runningBalance = 0
+  const balanceEvolutionData = sortedTransactions.length > 0
+    ? sortedTransactions.map((item) => {
+        runningBalance += item.amount
+        const [y, m, d] = item.date.split('-')
+        const shortDate = d && m ? `${d}/${m}` : item.date
+        return {
+          value: runningBalance,
+          label: shortDate,
+        }
+      })
+    : [
+        { value: 0, label: 'Início' },
+        { value: balance, label: 'Atual' }
+      ]
 
-  const typeData = [
-    {
-      name: 'Receitas',
-      value: transactions
-        .filter((item) => item.amount > 0)
-        .reduce((total, item) => total + item.amount, 0),
-    },
-    {
-      name: 'Despesas',
-      value: transactions
-        .filter((item) => item.amount < 0)
-        .reduce((total, item) => total + Math.abs(item.amount), 0),
-    },
-  ].filter((item) => item.value > 0)
+  // 2. Dados para o Gráfico de Pizza por Tipo
+  const typeMap: Record<string, number> = {
+    'Depósito': 0,
+    'Pix': 0,
+    'Transferência': 0,
+    'Pagamento': 0,
+  }
+
+  transactions.forEach((item) => {
+    if (typeMap[item.type] !== undefined) {
+      typeMap[item.type] += Math.abs(item.amount)
+    }
+  })
+
+  const typeData = Object.keys(typeMap)
+    .map((typeName) => ({
+      name: typeName,
+      value: typeMap[typeName],
+    }))
+    .filter((item) => item.value > 0)
+
+  // 3. Dados de Fluxo de Caixa (Últimos 3 meses)
+  const now = new Date()
+  const last3MonthsData = []
+  
+  for (let i = 2; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    const label = `${monthNames[d.getMonth()]} ${year}`
+
+    const monthTransactions = transactions.filter((item) => {
+      if (!item.date) return false
+      return item.date.startsWith(`${year}-${month}`)
+    })
+
+    const entradas = monthTransactions
+      .filter((item) => item.amount > 0)
+      .reduce((acc, item) => acc + item.amount, 0)
+
+    const saidas = monthTransactions
+      .filter((item) => item.amount < 0)
+      .reduce((acc, item) => acc + Math.abs(item.amount), 0)
+
+    last3MonthsData.push({
+      name: label,
+      Entradas: entradas,
+      Saidas: saidas,
+    })
+  }
 
   const handleAmountChange = (text: string) => {
     const cleanNumeric = text.replace(/\D/g, '')
@@ -241,95 +302,116 @@ export default function Home() {
           </PopupMenu>
         </View>
 
-        <Paper color="primary" style={styles.balanceCard}>
-          <View style={styles.balanceTopRow}>
-            <Typography color="white">Saldo</Typography>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                balanceVisible ? 'Ocultar saldo' : 'Mostrar saldo'
-              }
-              onPress={() => setBalanceVisible((current) => !current)}
-            >
-              <Typography color="white">{balanceVisible ? 'Ocultar' : 'Mostrar'}</Typography>
-            </Pressable>
-          </View>
-          <Typography variant="title-lg" color="white" weight="bold">
-            {balanceVisible ? formatCurrency(balance) : 'R$ ••••••'}
-          </Typography>
-          <Typography variant="body-sm" color="white">
-            Conta corrente
-          </Typography>
-        </Paper>
-
-        <View style={styles.sectionHeader}>
-          <Typography variant="title-lg" color="active" weight="bold">
-            Análises financeiras
-          </Typography>
-        </View>
-        <Paper style={styles.chartCard}>
-          <Chart
-            title="Receitas x Despesas"
-            type="line"
-            data={monthlyData}
-            series={[
-              { key: 'Receitas', name: 'Receitas', color: colors.success },
-              { key: 'Despesas', name: 'Despesas', color: colors.secondary },
-            ]}
-            axis={{ x: { key: 'name', show: true }, y: { show: true } }}
-          />
-        </Paper>
-        <Paper style={styles.chartCard}>
-          <Chart
-            title="Distribuição por tipo"
-            type="pie"
-            data={typeData.length > 0 ? typeData : [{ name: 'Nenhuma', value: 1 }]}
-            series={[{ key: 'value', name: 'Valor' }]}
-            axis={{ x: { show: false }, y: { show: false } }}
-          />
-        </Paper>
-
-        <Button size="large" fullWidth onPress={() => setIsModalOpen(true)}>
-          Nova transação
-        </Button>
-
-        <Paper style={styles.statement}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="title-lg" color="active" weight="bold">
-              Extrato
+        {/* Bloco Animado Envolvendo o Dashboard Principal */}
+        <Animated.View
+          style={[
+            styles.animatedContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          {/* Card de Saldo */}
+          <Paper color="primary" style={styles.balanceCard}>
+            <View style={styles.balanceTopRow}>
+              <Typography color="white">Saldo</Typography>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  balanceVisible ? 'Ocultar saldo' : 'Mostrar saldo'
+                }
+                onPress={() => setBalanceVisible((current) => !current)}
+              >
+                <Typography color="white">{balanceVisible ? 'Ocultar' : 'Mostrar'}</Typography>
+              </Pressable>
+            </View>
+            <Typography variant="title-lg" color="white" weight="bold">
+              {balanceVisible ? formatCurrency(balance) : 'R$ ••••••'}
             </Typography>
-            
-            <Pressable onPress={() => router.push('/transactions')}>
-              <Typography variant="body-sm" color="active" weight="bold" style={{ textDecorationLine: 'underline' }}>
-                Ver todas
-              </Typography>
-            </Pressable>
+            <Typography variant="body-sm" color="white">
+              Conta corrente
+            </Typography>
+          </Paper>
+
+          {/* Botão de Nova Transação logo abaixo do Saldo */}
+          <Button size="large" fullWidth onPress={() => setIsModalOpen(true)}>
+            Nova transação
+          </Button>
+
+          {/* Seção de Gráficos Analíticos */}
+          <View style={styles.sectionHeader}>
+            <Typography variant="title-lg" color="active" weight="bold">
+              Análises financeiras
+            </Typography>
           </View>
 
-          {transactions.length === 0 ? (
-            <Typography color="active">Nenhuma transação encontrada.</Typography>
-          ) : (
-            transactions.slice(0, 5).map((transaction) => (
-              <TransactionItem
-                key={transaction.id}
-                type={transaction.type}
-                name={transaction.name}
-                amount={transaction.amount}
-                date={formatDate(transaction.date)}
-                menuPlacement="home-stacked-date"
-                menuItems={[
-                  {
-                    id: `delete-${transaction.id}`,
-                    label: 'Excluir',
-                    onClick: () => removeTransaction(transaction.id),
-                  },
-                ]}
-              />
-            ))
-          )}
-        </Paper>
+          <Paper style={styles.chartCard}>
+            <Chart
+              title="Evolução do Saldo Acumulado"
+              type="line"
+              data={balanceEvolutionData}
+              series={[{ key: 'value', name: 'Saldo', color: colors.primary }]}
+              axis={{ x: { key: 'label', show: true }, y: { show: true } }}
+            />
+          </Paper>
+
+          <Paper style={styles.chartCard}>
+            <Chart
+              title="Fluxo de Caixa: Entradas vs Saídas"
+              type="bar"
+              data={last3MonthsData}
+              series={[
+                { key: 'Entradas', name: 'Entradas', color: colors.success },
+                { key: 'Saidas', name: 'Saídas', color: colors.secondary },
+              ]}
+              axis={{ x: { key: 'name', show: true }, y: { show: true } }}
+            />
+          </Paper>
+
+          <Paper style={styles.chartCard}>
+            <Chart
+              title="Distribuição por tipo"
+              type="pie"
+              data={typeData.length > 0 ? typeData : [{ name: 'Nenhuma', value: 1 }]}
+              series={[{ key: 'value', name: 'Valor' }]}
+              axis={{ x: { show: false }, y: { show: false } }}
+            />
+          </Paper>
+
+          {/* Seção de Últimas Transações (Resumo) com Botão de Exclusão por Lixeira */}
+          <Paper style={styles.statement}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="title-lg" color="active" weight="bold">
+                Últimas transações
+              </Typography>
+              
+              <Pressable onPress={() => router.push('/transactions')}>
+                <Typography variant="body-sm" color="active" weight="bold" style={{ textDecorationLine: 'underline' }}>
+                  Ver todas
+                </Typography>
+              </Pressable>
+            </View>
+
+            {transactions.length === 0 ? (
+              <Typography color="active">Nenhuma transação encontrada.</Typography>
+            ) : (
+              transactions.slice(0, 3).map((transaction) => (
+                <TransactionItem
+                  key={transaction.id}
+                  type={transaction.type}
+                  name={transaction.name}
+                  amount={transaction.amount}
+                  date={formatDate(transaction.date)}
+                  onDelete={() => removeTransaction(transaction.id)}
+                />
+              ))
+            )}
+          </Paper>
+        </Animated.View>
       </ScrollView>
 
+      {/* Modal de Nova Transação */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -449,6 +531,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     zIndex: 40,
+  },
+  animatedContainer: {
+    gap: 16,
   },
   balanceCard: {
     gap: 8,

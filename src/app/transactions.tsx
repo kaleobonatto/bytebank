@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router'
 import {
   collection,
+  deleteDoc,
+  doc,
   getDocs,
   limit,
   orderBy,
@@ -10,16 +12,16 @@ import {
   where
 } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { Icon, Input, Paper, Select, TransactionItem, Typography } from '@/components/ui'
+import { Button, Icon, Input, Paper, TransactionItem, Typography } from '@/components/ui'
 import { auth, db } from '@/services/firebase'
 import type { Transaction } from '@/shared/types/transaction'
 import { colors } from '@/styles/colors'
 
 const categoryOptions = [
-  { label: 'Todas as categorias', value: '' },
+  { label: 'Todas', value: '' },
   { label: 'Alimentação', value: 'Alimentação' },
   { label: 'Moradia', value: 'Moradia' },
   { label: 'Transporte', value: 'Transporte' },
@@ -30,20 +32,26 @@ const categoryOptions = [
   { label: 'Outros', value: 'Outros' },
 ]
 
+const formatDate = (value: string) => {
+  if (!value) return ''
+  const date = new Date(`${value}T12:00:00`)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR')
+}
+
 export default function TransactionScreen() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null)
   const [hasMore, setHasMore] = useState(true)
 
-  // Consulta paginada ao Cloud Firestore filtrando pelo usuário logado[cite: 1]
   const fetchTransactions = async (isInitial = false) => {
-    const user = auth?.currentUser || { uid: 'teste123' }
+    const user = auth?.currentUser
     if (!user) {
       setLoading(false)
       return
@@ -70,9 +78,9 @@ export default function TransactionScreen() {
       }
 
       const snapshot = await getDocs(q)
-      const data: Transaction[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const data: Transaction[] = snapshot.docs.map((docItem) => ({
+        id: docItem.id,
+        ...docItem.data(),
       })) as Transaction[]
 
       const lastVisible = snapshot.docs[snapshot.docs.length - 1]
@@ -97,7 +105,25 @@ export default function TransactionScreen() {
     fetchTransactions(true)
   }, [selectedCategory])
 
-  // Filtro local em memória por busca textual
+  function removeTransaction(id: string) {
+    Alert.alert('Excluir transação', 'Deseja excluir esta transação?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, 'transactions', id))
+            await fetchTransactions(true)
+          } catch (error) {
+            console.error('Erro ao excluir transação:', error)
+            Alert.alert('Erro', 'Não foi possível excluir o item.')
+          }
+        },
+      },
+    ])
+  }
+
   const filteredTransactions = transactions.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase())
     const matchesCategory = selectedCategory ? item.category === selectedCategory : true
@@ -107,8 +133,7 @@ export default function TransactionScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.mainContent}>
-        
-        {/* Cabeçalho com botão de voltar */}
+        {/* Cabeçalho */}
         <View style={styles.header}>
           <Pressable 
             onPress={() => router.push('/home')} 
@@ -124,25 +149,34 @@ export default function TransactionScreen() {
           </Typography>
         </View>
 
-        {/* Filtros */}
+        {/* Filtro de Categorias em Pílulas Horizontais */}
         <View style={styles.filterSection}>
-          <Input
-            placeholder="Pesquisar por descrição..."
-            value={search}
-            onChangeText={setSearch}
-            paddingSize="large"
-            style={styles.inputBackground}
-          />
-          <Select
-            placeholder="Filtrar por Categoria"
-            options={categoryOptions}
-            value={selectedCategory}
-            onChange={setSelectedCategory}
-            style={styles.inputBackground}
-          />
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pillsContainer}
+          >
+            {categoryOptions.map((cat) => {
+              const isSelected = selectedCategory === cat.value
+              return (
+                <Pressable
+                  key={cat.value}
+                  onPress={() => setSelectedCategory(cat.value)}
+                  style={[styles.pill, isSelected && styles.pillSelected]}
+                >
+                  <Typography 
+                    variant="body-sm" 
+                    style={[styles.pillText, isSelected && styles.pillTextSelected]}
+                  >
+                    {cat.label}
+                  </Typography>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
         </View>
 
-        {/* Lista com Scroll Infinito */}
+        {/* Lista de Transações */}
         <Paper style={styles.listCard}>
           {loading ? (
             <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
@@ -155,8 +189,8 @@ export default function TransactionScreen() {
                   type={item.type}
                   name={item.name}
                   amount={item.amount}
-                  date={item.date}
-                  menuPlacement="inline-right"
+                  date={formatDate(item.date)}
+                  onDelete={() => removeTransaction(item.id)}
                 />
               )}
               onEndReached={() => fetchTransactions(false)}
@@ -175,6 +209,49 @@ export default function TransactionScreen() {
           )}
         </Paper>
       </View>
+
+      {/* Botão Flutuante (FAB) de Pesquisa */}
+      <Pressable
+        style={styles.fab}
+        onPress={() => setIsSearchModalOpen(true)}
+        accessibilityLabel="Pesquisar transações"
+      >
+        <Icon name="search" size={24} color={colors.white} />
+      </Pressable>
+
+      {/* Modal de Pesquisa Rápida */}
+      <Modal
+        visible={isSearchModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsSearchModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.searchModalContent}>
+            <View style={styles.searchModalHeader}>
+              <Typography variant="title" weight="bold" color="active">
+                Pesquisar Transação
+              </Typography>
+              <Pressable onPress={() => setIsSearchModalOpen(false)}>
+                <Icon name="close" size={24} color={colors.primary} />
+              </Pressable>
+            </View>
+
+            <Input
+              placeholder="Digite a descrição (ex: Mercado)..."
+              value={search}
+              onChangeText={setSearch}
+              paddingSize="large"
+              autoFocus
+              style={styles.searchInput}
+            />
+
+            <Button size="large" fullWidth onPress={() => setIsSearchModalOpen(false)}>
+              Filtrar
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -202,12 +279,30 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 77, 97, 0.1)',
   },
   filterSection: {
-    gap: 12,
-    zIndex: 50,
-    elevation: 50,
+    height: 44,
   },
-  inputBackground: {
+  pillsContainer: {
+    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  pillSelected: {
+    backgroundColor: colors.primary,
+  },
+  pillText: {
+    color: colors.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  pillTextSelected: {
+    color: colors.white,
   },
   listCard: {
     flex: 1,
@@ -222,5 +317,48 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: 32,
     alignItems: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    zIndex: 99,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  searchModalContent: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 20,
+    gap: 16,
+  },
+  searchModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  searchInput: {
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+    borderRadius: 8,
   },
 })
