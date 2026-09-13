@@ -7,7 +7,7 @@ import Select from '@/components/ui/Select/Select'
 import Typography from '@/components/ui/Typography/Typography'
 import { colors } from '@/styles/colors'
 import type { TransactionType } from '@/types/transaction'
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 const typeOptions = [
   { value: 'Depósito', label: 'Depósito' },
@@ -172,7 +172,6 @@ export default function NewTransactionModal({
               </Pressable>
               {receiptUri && (
                 <View style={{ marginTop: 6, gap: 6 }}>
-                  <Image source={{ uri: receiptUri }} style={styles.receiptPreview} />
                   <Pressable onPress={() => setReceiptUri(null)} style={styles.removeImageButton}>
                     <Typography variant="body-sm" style={{ color: '#fff', fontSize: 12 }}>Remover anexo</Typography>
                   </Pressable>

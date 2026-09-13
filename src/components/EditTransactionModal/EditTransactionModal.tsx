@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker'
 import { useState } from 'react'
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import Datepicker from '@/components/Datepicker/Datepicker'
 import Button from '@/components/ui/Button/Button'
@@ -262,7 +262,6 @@ export default function EditTransactionModal({
 
               {receiptUri && (
                 <View style={styles.previewContainer}>
-                  <Image source={{ uri: receiptUri }} style={styles.receiptPreview} />
                   <Pressable 
                     onPress={() => setReceiptUri(null)}
                     style={styles.removeImageButton}

@@ -10,7 +10,6 @@ import { ActivityIndicator, View } from 'react-native'
 
 import { AuthProvider } from '@/contexts/AuthContext'
 import { TransactionProvider } from '@/contexts/TransactionContext'
-import { Header as AppHeader } from '../components/layout'
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -23,7 +22,6 @@ export default function RootLayout() {
   if (!fontsLoaded) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <AppHeader />
         <ActivityIndicator />
       </View>
     )

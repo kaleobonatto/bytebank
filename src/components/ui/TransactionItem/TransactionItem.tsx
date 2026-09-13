@@ -1,4 +1,4 @@
-import { Linking, Pressable, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 
 import Icon from '../Icon/Icon'
 import Typography from '../Typography/Typography'
@@ -40,20 +40,6 @@ export default function TransactionItem({
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            {receiptUrl ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ver recibo anexado"
-                onPress={() => Linking.openURL(receiptUrl)}
-                style={({ pressed }) => [
-                  styles.deleteButton,
-                  { backgroundColor: 'rgba(0, 77, 97, 0.08)' },
-                  pressed && { backgroundColor: 'rgba(0, 77, 97, 0.2)' },
-                ]}
-              >
-                <Icon name="attachment" size={18} color="#004d61" />
-              </Pressable>
-            ) : null}
 
             {onEdit ? (
               <Pressable
