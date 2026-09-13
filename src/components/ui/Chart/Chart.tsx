@@ -1,7 +1,6 @@
 import { StyleSheet, View } from 'react-native'
 import { PieChart } from 'react-native-gifted-charts'
-import Svg, { Circle, Path, Rect, Line as SvgLine, Text as SvgText } from 'react-native-svg'
-
+import Svg, { Circle, G, Path, Rect, Line as SvgLine, Text as SvgText } from 'react-native-svg'
 import Typography from '../Typography/Typography'
 import { chartTheme, transactionTypeColors } from './Chart.theme'
 import type { ChartProps } from './Chart.types'
@@ -181,7 +180,7 @@ export default function Chart({
           <Svg width={svgWidth} height={svgHeight}>
             {/* Linhas de Grade e Eixo Y */}
             {gridLines.map((line, idx) => (
-              <g key={idx}>
+              <G key={idx}>
                 <SvgLine
                   x1={paddingLeft}
                   y1={line.y}
@@ -201,7 +200,7 @@ export default function Chart({
                 >
                   {formatValueK(Math.round(line.val))}
                 </SvgText>
-              </g>
+              </G>
             ))}
 
             {/* Barras Agrupadas por Mês */}
@@ -211,7 +210,7 @@ export default function Chart({
               const barWidth = Math.min(16, (groupWidth - 16) / series.length)
 
               return (
-                <g key={groupIndex}>
+                <G key={groupIndex}>
                   {series.map((s, barIndex) => {
                     const val = getValue(row, s.key)
                     const barHeight = (val / range) * chartHeight
@@ -220,7 +219,7 @@ export default function Chart({
                     const barColor = s.color || chartTheme.colors.primary
 
                     return (
-                      <g key={s.key}>
+                      <G key={s.key}>
                         <Rect
                           x={barX}
                           y={barY}
@@ -229,7 +228,7 @@ export default function Chart({
                           fill={barColor}
                           rx={3}
                         />
-                      </g>
+                      </G>
                     )
                   })}
 
@@ -244,7 +243,7 @@ export default function Chart({
                   >
                     {label}
                   </SvgText>
-                </g>
+                </G>
               )
             })}
           </Svg>
@@ -315,7 +314,7 @@ export default function Chart({
       <View style={styles.canvas}>
         <Svg width={svgWidth} height={svgHeight}>
           {gridLines.map((line, idx) => (
-            <g key={idx}>
+            <G key={idx}>
               <SvgLine
                 x1={paddingLeft}
                 y1={line.y}
@@ -335,7 +334,7 @@ export default function Chart({
               >
                 {formatValueK(Math.round(line.val))}
               </SvgText>
-            </g>
+            </G>
           ))}
 
           {points.length > 1 && (
@@ -346,7 +345,7 @@ export default function Chart({
             const x = getX(index)
             const y = getY(pt.value)
             return (
-              <g key={index}>
+              <G key={index}>
                 <Circle cx={x} cy={y} r="5" fill={chartTheme.colors.primary} />
                 <SvgText
                   x={x}
@@ -358,7 +357,7 @@ export default function Chart({
                 >
                   {pt.label}
                 </SvgText>
-              </g>
+              </G>
             )
           })}
         </Svg>
