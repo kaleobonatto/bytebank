@@ -1,4 +1,4 @@
-import type { TransactionType } from '@/types/transaction'
+import type { TransactionType } from '@/domain/entities/Transaction'
 
 export interface EditTransactionModalProps {
   isOpen: boolean

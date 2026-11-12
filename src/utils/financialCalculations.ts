@@ -1,5 +1,5 @@
+import type { Transaction } from '@/domain/entities/Transaction'
 import { colors } from '@/styles/colors'
-import type { Transaction } from '@/types/transaction'
 
 export function calculateHomeMetrics(transactions: Transaction[]) {
   const balance = transactions.reduce((total, item) => total + item.amount, 0)

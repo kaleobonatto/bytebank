@@ -11,20 +11,16 @@ export type TransactionCategory =
   | 'Transferências'
   | 'Outros'
 
-export type TransactionAttachment = {
-  id: string
-  name: string
-  mimeType: string
-  size: number
-  url: string
-}
-
 export interface Transaction {
   id: string
+  userId: string
   type: TransactionType
   name: string
   amount: number
   date: string
-  category?: TransactionCategory
-  attachments?: TransactionAttachment[]
+  category?: TransactionCategory | string
+  receiptUrl?: string | null
 }
+
+// Tipo auxiliar para quando formos criar uma nova transação (ainda não tem ID nem userId atrelado)
+export type CreateTransactionDTO = Omit<Transaction, 'id' | 'userId'>

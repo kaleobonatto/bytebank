@@ -8,4 +8,21 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    // Esta regra garante a Clean Architecture
+    files: ['src/domain/**/*.ts', 'src/domain/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['firebase/*', 'react', 'react-native', '@/infrastructure/*', '@/app/*', '@/contexts/*'],
+              message: 'A camada de Domínio não pode depender de UI (React) ou Infraestrutura (Firebase).'
+            }
+          ]
+        }
+      ]
+    }
+  }
 ]);

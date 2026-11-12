@@ -1,19 +1,31 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getApp, getApps, initializeApp } from 'firebase/app'
+import { getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBTiF01MeEtudFv7PCOmViCXvFN9qH5CDQ",
-  authDomain: "bytebank-postech.firebaseapp.com",
-  projectId: "bytebank-postech",
-  storageBucket: "bytebank-postech.firebasestorage.app",
-  messagingSenderId: "286714351159",
-  appId: "1:286714351159:web:e05bb119ff5d98811df9b2"
-};
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+}
 
-const app = initializeApp(firebaseConfig)
+// Garante que o Firebase não inicialize duas vezes no Hot Reload do Expo
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
-export const auth = getAuth(app)
+// Inicializa a autenticação com persistência nativa
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    })
+  } catch {
+    return getAuth(app)
+  }
+})()
+
 export const db = getFirestore(app)
 export const storage = getStorage(app)

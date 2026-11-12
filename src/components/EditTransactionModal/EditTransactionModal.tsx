@@ -11,7 +11,7 @@ import Select from '@/components/ui/Select/Select'
 import Typography from '@/components/ui/Typography/Typography'
 import { colors } from '@/styles/colors'
 
-import type { TransactionType } from '@/types/transaction'
+import type { TransactionType } from '@/domain/entities/Transaction'
 
 const transactionOptions = [
   { value: 'Depósito', label: 'Depósito' },

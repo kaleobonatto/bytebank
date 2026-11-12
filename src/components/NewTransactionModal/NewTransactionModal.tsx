@@ -5,8 +5,8 @@ import Input from '@/components/ui/Input/Input'
 import Modal from '@/components/ui/Modal/Modal'
 import Select from '@/components/ui/Select/Select'
 import Typography from '@/components/ui/Typography/Typography'
+import type { TransactionType } from '@/domain/entities/Transaction'
 import { colors } from '@/styles/colors'
-import type { TransactionType } from '@/types/transaction'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 const typeOptions = [
