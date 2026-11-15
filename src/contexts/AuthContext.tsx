@@ -1,3 +1,5 @@
+import { cachedTransactionRepository } from '@/infrastructure/repositories/CachedTransactionRepository'
+import { useTransactionStore } from '@/presentation/stores/useTransactionStore'
 import { auth } from '@/services/firebase'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
@@ -23,8 +25,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [])
 
-  const logout = async () => {
+const logout = async () => {
     try {
+      if (user) {
+        await cachedTransactionRepository.invalidateCache(user.uid)
+      }
+      useTransactionStore.getState().reset()
       await signOut(auth)
     } catch (error) {
       console.error('Erro ao fazer logout:', error)

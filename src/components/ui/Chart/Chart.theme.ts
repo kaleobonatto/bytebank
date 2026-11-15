@@ -1,4 +1,4 @@
-import type { TransactionType } from '@bytebank/shared'
+import type { TransactionType } from '@/domain/entities/Transaction'
 
 export const chartTheme = {
   fontFamily: 'Inter, sans-serif',

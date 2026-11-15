@@ -49,11 +49,12 @@ export default function Home() {
   const slideAnim = useRef(new Animated.Value(30)).current
 
   // Carrega as transações assim que o componente monta e o usuário existe
-  useEffect(() => {
+useEffect(() => {
     if (user) {
       fetchTransactions(user.uid, true)
+      router.prefetch('/transactions') // Pré-carrega a rota de transações
     }
-  }, [user, fetchTransactions])
+  }, [user, fetchTransactions, router])
 
   useEffect(() => {
     Animated.parallel([

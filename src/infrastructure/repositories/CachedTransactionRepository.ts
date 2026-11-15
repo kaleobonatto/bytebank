@@ -8,17 +8,13 @@ import type { ITransactionRepository, PaginatedResult } from '@/domain/repositor
 const CACHE_KEY = '@bytebank:transactions'
 
 export class CachedTransactionRepository implements ITransactionRepository {
-  
   async getTransactions(userId: string, pageSize: number, lastItemId?: string): Promise<PaginatedResult<Transaction>> {
-    // 1. Se for a primeira página, tenta buscar do cache criptografado primeiro
     if (!lastItemId) {
       try {
         const encryptedCache = await AsyncStorage.getItem(`${CACHE_KEY}_${userId}`)
         if (encryptedCache) {
           const cachedData = cryptoService.decrypt<PaginatedResult<Transaction>>(encryptedCache)
-          // Dispara a busca no Firebase em background para manter os dados atualizados (Padrão Stale-while-revalidate)
           this.fetchAndCache(userId, pageSize)
-          
           if (cachedData) return cachedData
         }
       } catch (e) {
@@ -26,14 +22,12 @@ export class CachedTransactionRepository implements ITransactionRepository {
       }
     }
 
-    // 2. Se não tem cache ou é a próxima página da lista, busca direto do Firestore
     return this.fetchAndCache(userId, pageSize, lastItemId)
   }
 
-  // Método auxiliar que busca no Firestore e salva no cache cifrado
   private async fetchAndCache(userId: string, pageSize: number, lastItemId?: string) {
     const freshData = await firestoreRepo.getTransactions(userId, pageSize, lastItemId)
-    
+
     if (!lastItemId) {
       const encrypted = cryptoService.encrypt(freshData)
       await AsyncStorage.setItem(`${CACHE_KEY}_${userId}`, encrypted)
@@ -47,16 +41,17 @@ export class CachedTransactionRepository implements ITransactionRepository {
     return result
   }
 
-  async updateTransaction(id: string, data: Partial<Transaction>): Promise<void> {
+  async updateTransaction(id: string, data: Partial<Transaction>, userId?: string): Promise<void> {
     await firestoreRepo.updateTransaction(id, data)
+    if (userId) await this.invalidateCache(userId)
   }
 
-  async deleteTransaction(id: string): Promise<void> {
+  async deleteTransaction(id: string, userId?: string): Promise<void> {
     await firestoreRepo.deleteTransaction(id)
-    await this.invalidateCache(id) // O ID aqui precisaria ser o userId, mas a store já força o refetch.
+    if (userId) await this.invalidateCache(userId)
   }
 
-  private async invalidateCache(userId: string) {
+  async invalidateCache(userId: string) {
     await AsyncStorage.removeItem(`${CACHE_KEY}_${userId}`)
   }
 }
