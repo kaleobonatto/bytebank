@@ -1,10 +1,13 @@
+import { cachedTransactionRepository } from '@/infrastructure/repositories/CachedTransactionRepository'
+import { useTransactionStore } from '@/presentation/stores/useTransactionStore'
 import { auth } from '@/services/firebase'
-import { onAuthStateChanged, User } from 'firebase/auth'
+import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 
 type AuthContextType = {
   user: User | null
   loading: boolean
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType)
@@ -22,8 +25,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [])
 
+const logout = async () => {
+    try {
+      if (user) {
+        await cachedTransactionRepository.invalidateCache(user.uid)
+      }
+      useTransactionStore.getState().reset()
+      await signOut(auth)
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, logout }}>
       {children}
     </AuthContext.Provider>
   )

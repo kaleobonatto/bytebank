@@ -1,19 +1,21 @@
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
-import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import Avatar from '@/components/Avatar/Avatar'
 import NewTransactionModal from '@/components/NewTransactionModal/NewTransactionModal'
-import { Button, Chart, Paper, PopupMenu, TransactionItem, Typography } from '@/components/ui'
-import { auth } from '@/services/firebase'
+import { Button, Paper, PopupMenu, TransactionItem, Typography } from '@/components/ui'
+import type { TransactionType } from '@/domain/entities/Transaction'
 import { colors } from '@/styles/colors'
-import type { TransactionType } from '@/types/transaction'
 
-import { useTransactions } from '@/contexts/TransactionContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useTransactionStore } from '@/presentation/stores/useTransactionStore'
 import { uploadReceiptImage } from '@/services/uploadStorage'
 import { calculateHomeMetrics } from '@/utils/financialCalculations'
+
+const LazyChart = lazy(() => import('@/components/ui/Chart/Chart'))
 
 const formatDate = (value: string) => {
   if (!value) return ''
@@ -26,7 +28,10 @@ const formatCurrency = (value: number) =>
 
 export default function Home() {
   const router = useRouter()
-  const { transactions, addTransaction } = useTransactions()
+  const { user, logout } = useAuth()
+  
+  // Pegamos o estado e as ações da nossa nova Store (Zustand)
+  const { transactions, fetchTransactions, addTransaction } = useTransactionStore()
 
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -42,6 +47,14 @@ export default function Home() {
 
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(30)).current
+
+  // Carrega as transações assim que o componente monta e o usuário existe
+useEffect(() => {
+    if (user) {
+      fetchTransactions(user.uid, true)
+      router.prefetch('/transactions') // Pré-carrega a rota de transações
+    }
+  }, [user, fetchTransactions, router])
 
   useEffect(() => {
     Animated.parallel([
@@ -93,7 +106,6 @@ export default function Home() {
     }
 
     setErrors({})
-    const user = auth?.currentUser
     if (!user) return
 
     try {
@@ -103,14 +115,14 @@ export default function Home() {
       const isIncome = type === 'Depósito' || type === 'Pix'
       const finalAmount = isIncome ? Math.abs(numericAmount) : -Math.abs(numericAmount)
 
-      const success = await addTransaction({
-        type,
+      const success = await addTransaction(user.uid, {
+        type: type as TransactionType,
         name: name.trim(),
         amount: finalAmount,
         date,
         category,
-        receiptUrl: receiptUrl || undefined,
-      } as any)
+        receiptUrl: receiptUrl || null,
+      })
 
       if (success) {
         setType('')
@@ -142,7 +154,7 @@ export default function Home() {
               {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
             </Typography>
           </View>
-          <PopupMenu align="right" items={[{ id: 'logout', label: 'Sair', onClick: () => router.replace('/login') }]}>
+          <PopupMenu align="right" items={[{ id: 'logout', label: 'Sair', onClick: logout }]}>
             <Avatar />
           </PopupMenu>
         </View>
@@ -169,17 +181,19 @@ export default function Home() {
             <Typography variant="title-lg" color="active" weight="bold">Análises financeiras</Typography>
           </View>
 
-          <Paper style={styles.chartCard}>
-            <Chart title="Evolução do Saldo Acumulado" type="line" data={balanceEvolutionData} series={[{ key: 'value', name: 'Saldo', color: colors.primary }]} axis={{ x: { key: 'label', show: true }, y: { show: true } }} />
-          </Paper>
+            <Suspense fallback={<ActivityIndicator size="large" color={colors.primary} style={{ margin: 20 }} />}>
+            <Paper style={styles.chartCard}>
+              <LazyChart title="Evolução do Saldo Acumulado" type="line" data={balanceEvolutionData} series={[{ key: 'value', name: 'Saldo', color: colors.primary }]} axis={{ x: { key: 'label', show: true }, y: { show: true } }} />
+            </Paper>
 
-          <Paper style={styles.chartCard}>
-            <Chart title="Fluxo de Caixa: Entradas vs Saídas" type="bar" data={last3MonthsData} series={[{ key: 'Entradas', name: 'Entradas', color: colors.success }, { key: 'Saidas', name: 'Saídas', color: colors.secondary }]} axis={{ x: { key: 'name', show: true }, y: { show: true } }} />
-          </Paper>
+            <Paper style={styles.chartCard}>
+              <LazyChart title="Fluxo de Caixa: Entradas vs Saídas" type="bar" data={last3MonthsData} series={[{ key: 'Entradas', name: 'Entradas', color: colors.success }, { key: 'Saidas', name: 'Saídas', color: colors.secondary }]} axis={{ x: { key: 'name', show: true }, y: { show: true } }} />
+            </Paper>
 
-          <Paper style={styles.chartCard}>
-            <Chart title="Distribuição por tipo" type="pie" data={typeData} series={[{ key: 'value', name: 'Valor' }]} axis={{ x: { show: false }, y: { show: false } }} />
-          </Paper>
+            <Paper style={styles.chartCard}>
+              <LazyChart title="Distribuição por tipo" type="pie" data={typeData} series={[{ key: 'value', name: 'Valor' }]} axis={{ x: { show: false }, y: { show: false } }} />
+            </Paper>
+          </Suspense>
 
           <Paper style={styles.statement}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -199,7 +213,7 @@ export default function Home() {
                   name={transaction.name}
                   amount={transaction.amount}
                   date={formatDate(transaction.date)}
-                  receiptUrl={(transaction as any).receiptUrl}
+                  receiptUrl={transaction.receiptUrl ?? undefined}
                 />
               ))
             )}
@@ -211,7 +225,7 @@ export default function Home() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         type={type}
-        setType={setType}
+        setType={setType as any}
         category={category}
         setCategory={setCategory}
         name={name}

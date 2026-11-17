@@ -1,15 +1,19 @@
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+
+// Importações do RxJS para Programação Reativa
+import { BehaviorSubject } from 'rxjs'
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators'
 
 import EditTransactionModal from '@/components/EditTransactionModal/EditTransactionModal'
 import { Button, Icon, Input, Paper, TransactionItem, Typography } from '@/components/ui'
-import { useTransactions } from '@/contexts/TransactionContext'
-import { auth } from '@/services/firebase'
+import { useAuth } from '@/contexts/AuthContext'
+import type { Transaction } from '@/domain/entities/Transaction'
+import { useTransactionStore } from '@/presentation/stores/useTransactionStore'
 import { uploadReceiptImage } from '@/services/uploadStorage'
 import { colors } from '@/styles/colors'
-import type { Transaction } from '@/types/transaction'
 
 const categoryOptions = [
   { label: 'Todas', value: '' },
@@ -31,19 +35,54 @@ const formatDate = (value: string) => {
 
 export default function TransactionScreen() {
   const router = useRouter()
+  const { user } = useAuth()
   
-  const { transactions, loading, loadingMore, fetchTransactions, removeTransaction, editTransaction } = useTransactions()
+  const { transactions, loading, loadingMore, fetchTransactions, removeTransaction, editTransaction } = useTransactionStore()
   
-  const [search, setSearch] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
 
+  // Criamos o nosso "Subject" reativo
+  const searchSubject = useRef(new BehaviorSubject('')).current
+
+  useEffect(() => {
+    // Configura o Pipeline Reativo
+    const subscription = searchSubject.pipe(
+      debounceTime(300), // Aguarda 300ms de "silêncio" na digitação
+      distinctUntilChanged() // Só emite se o termo for realmente diferente
+    ).subscribe((value) => {
+      setDebouncedSearch(value)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [searchSubject])
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text) // Atualiza o input imediatamente (UI)
+    searchSubject.next(text) // Envia para a fila do RxJS
+  }
+
+  // Filtragem local baseada na string "debounced"
   const filteredTransactions = transactions.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
     const matchesCategory = selectedCategory ? item.category === selectedCategory : true
     return matchesSearch && matchesCategory
   })
+
+  const handleDelete = (id: string) => {
+    if (!user) return
+    Alert.alert('Excluir transação', 'Deseja excluir esta transação?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: () => removeTransaction(id, user.uid)
+      },
+    ])
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -52,10 +91,7 @@ export default function TransactionScreen() {
         <View style={styles.header}>
           <Pressable 
             onPress={() => router.push('/home')} 
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed
-            ]}
+            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
           >
             <Icon name="arrow-back" size={28} color={colors.primary} />
           </Pressable>
@@ -105,12 +141,14 @@ export default function TransactionScreen() {
                   name={item.name}
                   amount={item.amount}
                   date={formatDate(item.date)}
-                  receiptUrl={(item as any).receiptUrl}
-                  onDelete={() => removeTransaction(item.id)}
+                  receiptUrl={item.receiptUrl ?? undefined}
+                  onDelete={() => handleDelete(item.id)}
                   onEdit={() => setEditingTransaction(item)}
                 />
               )}
-              onEndReached={() => fetchTransactions(false)}
+              onEndReached={() => {
+                 if (user) fetchTransactions(user.uid, false)
+              }}
               onEndReachedThreshold={0.4}
               ListFooterComponent={
                 loadingMore ? (
@@ -155,9 +193,9 @@ export default function TransactionScreen() {
             </View>
 
             <Input
-              placeholder="Digite a descrição (ex: Mercado)..."
-              value={search}
-              onChangeText={setSearch}
+              placeholder="Digite a descrição..."
+              value={searchQuery}
+              onChangeText={handleSearchChange}
               paddingSize="large"
               autoFocus
               style={styles.searchInput}
@@ -177,19 +215,18 @@ export default function TransactionScreen() {
           onClose={() => setEditingTransaction(null)}
           initial={{
             id: editingTransaction.id,
-            type: editingTransaction.type,
+            type: editingTransaction.type as any,
             name: editingTransaction.name,
             amount: editingTransaction.amount,
             date: editingTransaction.date,
             category: editingTransaction.category,
-            receiptUrl: (editingTransaction as any).receiptUrl,
+            receiptUrl: editingTransaction.receiptUrl ?? undefined,
           }}
           onSubmit={async (payload) => {
-            if (payload.id) {
-              const user = auth?.currentUser
+            if (payload.id && user) {
               let finalReceiptUrl = payload.receiptUrl
 
-              if (payload.receiptUrl && payload.receiptUrl.startsWith('file://') && user) {
+              if (payload.receiptUrl && payload.receiptUrl.startsWith('file://')) {
                 const uploaded = await uploadReceiptImage(payload.receiptUrl, user.uid)
                 if (uploaded) finalReceiptUrl = uploaded
               }
@@ -199,14 +236,14 @@ export default function TransactionScreen() {
                   ? Math.abs(payload.amount) 
                   : -Math.abs(payload.amount)
 
-              const success = await editTransaction(payload.id, {
-                type: payload.type,
+              const success = await editTransaction(payload.id, user.uid, {
+                type: payload.type as any,
                 name: payload.name,
                 amount: finalAmount,
                 date: payload.date,
                 category: payload.category as any,
                 receiptUrl: finalReceiptUrl,
-              } as any)
+              })
 
               if (success) setEditingTransaction(null)
             }
@@ -218,108 +255,24 @@ export default function TransactionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.tertiary,
-  },
-  mainContent: {
-    flex: 1,
-    padding: 16,
-    gap: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    padding: 4,
-    borderRadius: 8,
-  },
-  backButtonPressed: {
-    backgroundColor: 'rgba(0, 77, 97, 0.1)',
-  },
-  filterSection: {
-    height: 44,
-  },
-  pillsContainer: {
-    gap: 8,
-    alignItems: 'center',
-    paddingHorizontal: 2,
-  },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  pillSelected: {
-    backgroundColor: colors.primary,
-  },
-  pillText: {
-    color: colors.primary,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  pillTextSelected: {
-    color: colors.white,
-  },
-  listCard: {
-    flex: 1,
-    padding: 8,
-  },
-  loader: {
-    marginTop: 32,
-  },
-  footerLoader: {
-    marginVertical: 16,
-  },
-  emptyContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    zIndex: 99,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  searchModalContent: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 20,
-    gap: 16,
-  },
-  searchModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  searchInput: {
-    backgroundColor: colors.white,
-    borderColor: colors.primary,
-    borderWidth: 1.5,
-    borderRadius: 8,
-  },
+  container: { flex: 1, backgroundColor: colors.tertiary },
+  mainContent: { flex: 1, padding: 16, gap: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  backButton: { padding: 4, borderRadius: 8 },
+  backButtonPressed: { backgroundColor: 'rgba(0, 77, 97, 0.1)' },
+  filterSection: { height: 44 },
+  pillsContainer: { gap: 8, alignItems: 'center', paddingHorizontal: 2 },
+  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.primary },
+  pillSelected: { backgroundColor: colors.primary },
+  pillText: { color: colors.primary, fontFamily: 'Inter_600SemiBold' },
+  pillTextSelected: { color: colors.white },
+  listCard: { flex: 1, padding: 8 },
+  loader: { marginTop: 32 },
+  footerLoader: { marginVertical: 16 },
+  emptyContainer: { padding: 32, alignItems: 'center' },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 6 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  searchModalContent: { width: '100%', maxWidth: 400, backgroundColor: colors.white, borderRadius: 12, padding: 20, gap: 16 },
+  searchModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  searchInput: { backgroundColor: colors.white, borderColor: colors.primary, borderWidth: 1.5, borderRadius: 8 },
 })
