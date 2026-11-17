@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Pressable, View } from 'react-native'
 
 import Icon from '../Icon/Icon'
@@ -6,7 +7,7 @@ import Typography from '../Typography/Typography'
 import { styles } from './TransactionItem.styles'
 import type { TransactionItemProps } from './TransactionItem.types'
 
-export default function TransactionItem({
+function TransactionItem({
   type,
   name,
   amount,
@@ -40,7 +41,6 @@ export default function TransactionItem({
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-
             {onEdit ? (
               <Pressable
                 accessibilityRole="button"
@@ -87,3 +87,5 @@ export default function TransactionItem({
     </View>
   )
 }
+
+export default memo(TransactionItem)
